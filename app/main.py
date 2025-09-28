@@ -1,5 +1,12 @@
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
+from sqlalchemy import or_
+from sqlalchemy.orm import Session
+
+from .database import engine, get_db
+from .models import Base, User
+
+Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="SecDev Course App", version="0.1.0")
 
@@ -29,7 +36,75 @@ async def http_exception_handler(request: Request, exc: HTTPException):
     )
 
 
-@app.get("/health")
+@app.post("/users")
+async def create_user(
+    name: str, email: str, password: str, db: Session = Depends(get_db)
+):
+    user = (
+        db.query(User).filter(or_(User.username == name, User.email == email)).first()
+    )
+    if user:
+        raise HTTPException(status_code=400, detail="Такой пользователь уже есть")
+    user = User(username=name, email=email, password=password)
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+@app.get("/users")
+async def get_users(db: Session = Depends(get_db)):
+    return db.query(User).all()
+
+
+@app.get("/users/{user_id}")
+async def get_user_by_id(user_id: int, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.id == user_id).first()
+    if user is None:
+        raise HTTPException(status_code=404, detail="Пользователь не найден")
+    return user
+
+
+@app.delete("/users/{user_id}")
+async def delete_user_by_id(user_id: int, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Пользователь не найден")
+    db.delete(user)
+    db.commit()
+    return user
+
+
+@app.put("/users/{user_id}")
+async def update_user(
+    user_id: int,
+    db: Session = Depends(get_db),
+    name: str = None,
+    email: str = None,
+    password: str = None,
+):
+    user = (
+        db.query(User).filter(or_(User.email == email, User.username == name)).first()
+    )
+    if user:
+        raise HTTPException(status_code=400, detail="Такой пользователь уже есть")
+    user_db = db.query(User).filter(User.id == user_id).first()
+    if not user_db:
+        raise HTTPException(status_code=404, detail="Такого пользователя нет")
+
+    if name is not None:
+        user_db.username = name
+    if email is not None:
+        user_db.email = email
+    if password is not None:
+        user_db.password = password
+
+    db.commit()
+    db.refresh(user_db)
+    return user_db
+
+
+@app.get("/health", include_in_schema=False)
 def health():
     return {"status": "ok"}
 
@@ -38,7 +113,7 @@ def health():
 _DB = {"items": []}
 
 
-@app.post("/items")
+@app.post("/items", include_in_schema=False)
 def create_item(name: str):
     if not name or len(name) > 100:
         raise ApiError(
@@ -49,7 +124,7 @@ def create_item(name: str):
     return item
 
 
-@app.get("/items/{item_id}")
+@app.get("/items/{item_id}", include_in_schema=False)
 def get_item(item_id: int):
     for it in _DB["items"]:
         if it["id"] == item_id:
