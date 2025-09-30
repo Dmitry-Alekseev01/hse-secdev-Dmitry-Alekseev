@@ -30,7 +30,7 @@ def test_get_users(client, sample_user):
 def test_get_user_by_id_not_found(client):
     response = client.get("/users/999")
     assert response.status_code == 404
-    assert "Пользователь не найден" in response.json()["error"]["message"]
+    assert "Такого пользователя нет" in response.json()["error"]["message"]
 
 
 def test_get_user_by_id_success(client, sample_user):

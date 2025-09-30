@@ -44,7 +44,9 @@ async def create_user(
         db.query(User).filter(or_(User.username == name, User.email == email)).first()
     )
     if user:
-        raise HTTPException(status_code=400, detail="Такой пользователь уже есть")
+        raise ApiError(
+            code="existing user", message="Такой пользователь уже есть", status=400
+        )
     user = User(username=name, email=email, password=password)
     db.add(user)
     db.commit()
@@ -61,7 +63,9 @@ async def get_users(db: Session = Depends(get_db)):
 async def get_user_by_id(user_id: int, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.id == user_id).first()
     if user is None:
-        raise HTTPException(status_code=404, detail="Пользователь не найден")
+        raise ApiError(
+            code="non existing user", message="Такого пользователя нет", status=404
+        )
     return user
 
 
@@ -69,7 +73,9 @@ async def get_user_by_id(user_id: int, db: Session = Depends(get_db)):
 async def delete_user_by_id(user_id: int, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
-        raise HTTPException(status_code=404, detail="Пользователь не найден")
+        raise ApiError(
+            code="non existing user", message="Такого пользователя нет", status=404
+        )
     db.delete(user)
     db.commit()
     return user
@@ -87,10 +93,14 @@ async def update_user(
         db.query(User).filter(or_(User.email == email, User.username == name)).first()
     )
     if user:
-        raise HTTPException(status_code=400, detail="Такой пользователь уже есть")
+        raise ApiError(
+            code="existing user", message="Такой пользователь уже есть", status=400
+        )
     user_db = db.query(User).filter(User.id == user_id).first()
     if not user_db:
-        raise HTTPException(status_code=404, detail="Такого пользователя нет")
+        raise ApiError(
+            code="non existing user", message="Такого пользователя нет", status=404
+        )
 
     if name is not None:
         user_db.username = name
