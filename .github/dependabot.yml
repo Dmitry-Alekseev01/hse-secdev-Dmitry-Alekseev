@@ -1,6 +1,5 @@
 version: 2
 updates:
-  # Проверка Python зависимостей
   - package-ecosystem: "pip"
     directory: "/"
     schedule:
@@ -9,9 +8,6 @@ updates:
     labels:
       - "dependencies"
       - "security"
-    commit-message:
-      prefix: "⬆️"
-    # Настройка безопасности - автоматически создает PR для уязвимостей
     groups:
       security-dependencies:
         patterns:
@@ -20,7 +16,6 @@ updates:
           - "minor"
           - "patch"
 
-  # Если используете GitHub Actions
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
