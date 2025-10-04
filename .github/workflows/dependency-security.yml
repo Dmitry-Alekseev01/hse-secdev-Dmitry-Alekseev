@@ -1,0 +1,53 @@
+name: Dependency security scan
+
+on:
+  schedule:
+    - cron: '0 6 * * 1'  # Каждый понедельник в 6 утра
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:  # Ручной запуск
+
+jobs:
+  security-scan:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+
+    - name: Install dependencies
+      run: |
+        pip install -r requirements.txt
+        pip install safety pip-audit
+
+    - name: Run safety check
+      run: |
+        safety check --json --output safety-report.json || true
+
+    - name: Run pip-audit
+      run: |
+        pip-audit --format json --output pip-audit-report.json || true
+
+    - name: Generate security report
+      run: |
+        python scripts/generate_dependency_report.py
+
+    - name: Upload security reports
+      uses: actions/upload-artifact@v3
+      with:
+        name: dependency-security-reports
+        path: |
+          safety-report.json
+          pip-audit-report.json
+          dependency-security-report.md
+
+    - name: Check for critical vulnerabilities
+      run: |
+        python scripts/check_critical_vulns.py
