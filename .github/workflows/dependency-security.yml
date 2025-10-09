@@ -1,0 +1,23 @@
+name: Dependency security scan
+
+on:
+  schedule:
+    - cron: '0 6 * * 1'
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  security-scan:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+    - name: Install and run safety check
+      run: |
+        pip install safety
+        safety check --short-report || echo "Vulnerabilities found - check Dependabot alerts"
