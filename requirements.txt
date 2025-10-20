@@ -3,3 +3,4 @@ uvicorn==0.30.5
 sqlalchemy==2.0.23
 pydantic==2.5.0
 alembic==1.12.1
+slowapi==0.1.9
