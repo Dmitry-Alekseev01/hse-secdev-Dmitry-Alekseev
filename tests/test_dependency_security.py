@@ -14,7 +14,7 @@ class TestDependencySecurity:
 
     def test_dependabot_config_valid(self):
         """Проверяет валидность конфигурации Dependabot"""
-        with open(".github/dependabot.yml", "r", encoding="utf-8") as f:
+        with open(".github/dependabot.yml", encoding="utf-8") as f:
             config = yaml.safe_load(f)
 
         assert config["version"] == 2, "Dependabot version should be 2"
@@ -34,9 +34,7 @@ class TestDependencySecurity:
 
     def test_security_workflow_triggers(self):
         """Проверяет триггеры security workflow"""
-        with open(
-            ".github/workflows/dependency-security.yml", "r", encoding="utf-8"
-        ) as f:
+        with open(".github/workflows/dependency-security.yml", encoding="utf-8") as f:
             workflow = yaml.safe_load(f)
 
         on_section = workflow.get("on", {})
@@ -75,7 +73,7 @@ class TestDependencySecurity:
 
     def test_requirements_format(self):
         """Проверяет формат requirements.txt"""
-        with open("requirements.txt", "r", encoding="utf-8") as f:
+        with open("requirements.txt", encoding="utf-8") as f:
             content = f.read()
 
         lines = [line.strip() for line in content.split("\n") if line.strip()]
@@ -99,7 +97,7 @@ class TestDependencyVulnerabilities:
 
     def test_no_known_vulnerable_packages(self):
         """Проверяет, что нет пакетов с известными критическими уязвимостями"""
-        with open("requirements.txt", "r", encoding="utf-8") as f:
+        with open("requirements.txt", encoding="utf-8") as f:
             current_dependencies = [
                 line.strip() for line in f if line.strip() and not line.startswith("#")
             ]
@@ -143,7 +141,7 @@ class TestDependencyPinning:
 
     def test_all_dependencies_pinned(self):
         """Проверяет, что все зависимости закреплены на конкретных версиях"""
-        with open("requirements.txt", "r", encoding="utf-8") as f:
+        with open("requirements.txt", encoding="utf-8") as f:
             lines = [
                 line.strip() for line in f if line.strip() and not line.startswith("#")
             ]
@@ -165,7 +163,7 @@ class TestDependencyStructure:
 
     def test_no_local_dependencies_in_production(self):
         """Проверяет, что нет локальных путей в requirements.txt"""
-        with open("requirements.txt", "r", encoding="utf-8") as f:
+        with open("requirements.txt", encoding="utf-8") as f:
             content = f.read()
 
         local_path_indicators = ["/", "\\", "file:", "git+", "hg+", "svn+", "bzr+"]
