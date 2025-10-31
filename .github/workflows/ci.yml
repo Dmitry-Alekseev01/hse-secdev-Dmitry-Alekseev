@@ -31,16 +31,21 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Run Bandit Security Scan
-        uses: shundor/python-bandit-sarif@v2
+      - name: Run Bandit Security Scan and convert to SARIF
+        uses: advanced-security/bandit-sarif-formatter-action@v2
         with:
           output: bandit-report.sarif
-          path: app/
+          target: app/
 
       - name: Upload Bandit SARIF results
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: bandit-report.sarif
+
+      - name: Safety check
+        uses: py-actions/pip-audit@v1
+        with:
+          requirement-files: "requirements.txt,requirements-dev.txt"
 
   build:
     runs-on: ubuntu-latest
@@ -57,12 +62,25 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt -r requirements-dev.txt
 
-      - name: Run tests and checks
+      - name: Lint & Format
         run: |
-          pip install pytest mypy ruff black isort pre-commit
-          ruff check .
+          ruff check --output-format=github .
           black --check .
           isort --check-only .
-          mypy app/
-          pytest --cov=app --cov-report=xml --cov-fail-under=80
-          pre-commit run --all-files
+
+      - name: Type checking
+        run: mypy app/
+
+      - name: Tests with coverage
+        run: |
+          pytest --cov=app --cov-report=xml --cov-report=term-missing --cov-fail-under=80
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./coverage.xml
+          flags: unittests
+          name: codecov-umbrella
+
+      - name: Pre-commit (all files)
+        run: pre-commit run --all-files
