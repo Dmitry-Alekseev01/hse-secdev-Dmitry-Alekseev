@@ -1,3 +1,5 @@
+import uuid
+
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
@@ -35,20 +37,19 @@ def test_db():
 
 
 def test_health_endpoint():
-    """Тест эндпоинта здоровья"""
     response = client.get("/health")
     assert response.status_code == 200
     assert response.json() == {"status": "ok"}
 
 
 def test_create_user_success(test_db):
-    """Тест успешного создания пользователя"""
+    unique_id = uuid.uuid4().hex[:8]
     response = client.post(
         "/users",
-        json={  # Используем json вместо data
-            "name": "testuser",
-            "email": "test@example.com",
-            "password": "testpass",
+        json={
+            "name": f"testuser_{unique_id}",
+            "email": f"test_{unique_id}@example.com",
+            "password": "Testpass123",
         },
     )
     assert response.status_code == 200
@@ -57,15 +58,14 @@ def test_create_user_success(test_db):
     assert "username" in data
     assert "email" in data
     assert "id" in data
-    assert data["username"] == "testuser"
-    assert data["email"] == "test@example.com"
+    assert data["username"] == f"testuser_{unique_id}"
+    assert data["email"] == f"test_{unique_id}@example.com"
 
 
 def test_create_user_duplicate(test_db):
-    """Тест создания дубликата пользователя"""
     response1 = client.post(
         "/users",
-        json={"name": "user1", "email": "user1@example.com", "password": "pass1"},
+        json={"name": "user1", "email": "user1@example.com", "password": "Pass12345"},
     )
     assert response1.status_code == 200
 
@@ -73,8 +73,8 @@ def test_create_user_duplicate(test_db):
         "/users",
         json={
             "name": "user2",
-            "email": "user1@example.com",  # Дублирующий email
-            "password": "pass2",
+            "email": "user1@example.com",
+            "password": "Pass12346",
         },
     )
 
@@ -84,7 +84,6 @@ def test_create_user_duplicate(test_db):
 
 
 def test_get_users_empty(test_db):
-    """Тест получения пустого списка пользователей"""
     response = client.get("/users")
     assert response.status_code == 200
     users = response.json()
@@ -93,14 +92,13 @@ def test_get_users_empty(test_db):
 
 
 def test_get_users_with_data(test_db):
-    """Тест получения списка пользователей с данными"""
     client.post(
         "/users",
-        json={"name": "user1", "email": "user1@example.com", "password": "pass1"},
+        json={"name": "user1", "email": "user1@example.com", "password": "Pass12345"},
     )
     client.post(
         "/users",
-        json={"name": "user2", "email": "user2@example.com", "password": "pass2"},
+        json={"name": "user2", "email": "user2@example.com", "password": "Pass12346"},
     )
 
     response = client.get("/users")
@@ -113,10 +111,13 @@ def test_get_users_with_data(test_db):
 
 
 def test_get_user_by_id_success(test_db):
-    """Тест успешного получения пользователя по ID"""
     create_response = client.post(
         "/users",
-        json={"name": "testuser", "email": "test@example.com", "password": "testpass"},
+        json={
+            "name": "testuser",
+            "email": "test@example.com",
+            "password": "Testpass123",
+        },
     )
     assert create_response.status_code == 200
     user_data = create_response.json()
@@ -130,7 +131,6 @@ def test_get_user_by_id_success(test_db):
 
 
 def test_get_user_by_id_not_found(test_db):
-    """Тест получения несуществующего пользователя"""
     response = client.get("/users/999")
     assert response.status_code == 404
     error_data = response.json()
@@ -138,10 +138,13 @@ def test_get_user_by_id_not_found(test_db):
 
 
 def test_delete_user_success(test_db):
-    """Тест успешного удаления пользователя"""
     create_response = client.post(
         "/users",
-        json={"name": "todelete", "email": "delete@example.com", "password": "pass"},
+        json={
+            "name": "todelete",
+            "email": "delete@example.com",
+            "password": "Password1",
+        },  # Исправленный пароль
     )
     assert create_response.status_code == 200
     user_id = create_response.json()["id"]
@@ -154,7 +157,6 @@ def test_delete_user_success(test_db):
 
 
 def test_delete_user_not_found(test_db):
-    """Тест удаления несуществующего пользователя"""
     response = client.delete("/users/999")
     assert response.status_code == 404
     error_data = response.json()
@@ -162,17 +164,24 @@ def test_delete_user_not_found(test_db):
 
 
 def test_update_user_success(test_db):
-    """Тест успешного обновления пользователя"""
     create_response = client.post(
         "/users",
-        json={"name": "original", "email": "original@example.com", "password": "pass"},
+        json={
+            "name": "original",
+            "email": "original@example.com",
+            "password": "Password1",
+        },
     )
     assert create_response.status_code == 200
     user_id = create_response.json()["id"]
 
     response = client.put(
         f"/users/{user_id}",
-        json={"name": "updated", "email": "updated@example.com", "password": "newpass"},
+        json={
+            "name": "updated",
+            "email": "updated@example.com",
+            "password": "Newpass123",
+        },
     )
 
     assert response.status_code == 200
@@ -182,10 +191,13 @@ def test_update_user_success(test_db):
 
 
 def test_update_user_partial(test_db):
-    """Тест частичного обновления пользователя"""
     create_response = client.post(
         "/users",
-        json={"name": "partial", "email": "partial@example.com", "password": "pass"},
+        json={
+            "name": "partial",
+            "email": "partial@example.com",
+            "password": "Password1",
+        },
     )
     assert create_response.status_code == 200
     user_id = create_response.json()["id"]
@@ -195,18 +207,17 @@ def test_update_user_partial(test_db):
     assert response.status_code == 200
     updated_user = response.json()
     assert updated_user["username"] == "partial_updated"
-    assert updated_user["email"] == "partial@example.com"  # осталось прежним
+    assert updated_user["email"] == "partial@example.com"
 
 
 def test_update_user_duplicate_email(test_db):
-    """Тест обновления с дублирующимся email"""
     client.post(
         "/users",
-        json={"name": "user1", "email": "user1@example.com", "password": "pass1"},
+        json={"name": "user1", "email": "user1@example.com", "password": "Pass12345"},
     )
     create_response = client.post(
         "/users",
-        json={"name": "user2", "email": "user2@example.com", "password": "pass2"},
+        json={"name": "user2", "email": "user2@example.com", "password": "Pass12346"},
     )
     user2_data = create_response.json()
     user2_id = user2_data["id"]
@@ -219,7 +230,6 @@ def test_update_user_duplicate_email(test_db):
 
 
 def test_update_user_not_found(test_db):
-    """Тест обновления несуществующего пользователя"""
     response = client.put("/users/999", json={"name": "updated"})
     assert response.status_code == 404
     error_data = response.json()
@@ -227,7 +237,6 @@ def test_update_user_not_found(test_db):
 
 
 def test_error_response_format(test_db):
-    """Тест формата ошибки RFC7807"""
     response = client.get("/users/999")
 
     assert response.status_code == 404
