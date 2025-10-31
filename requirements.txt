@@ -1,6 +1,6 @@
-fastapi==0.112.2
-uvicorn==0.30.5
-sqlalchemy==2.0.23
-pydantic==2.5.0
-alembic==1.12.1
+fastapi==0.120.4
+uvicorn==0.38.0
+sqlalchemy==2.0.44
+pydantic==2.12.3
+alembic==1.17.1
 slowapi==0.1.9
