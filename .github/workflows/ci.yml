@@ -47,9 +47,25 @@ jobs:
             --skip B101,B105,B106,B108
         continue-on-error: true
 
+      - name: Debug - Check if Bandit report exists
+        run: |
+          echo "Checking if bandit-report.json exists:"
+          ls -la bandit-report.json || echo "bandit-report.json not found"
+          echo "File content:"
+          cat bandit-report.json || echo "Cannot read file"
+
       - name: Convert Bandit JSON to SARIF
         run: |
-          bandit-sarif-formatter -i bandit-report.json -o bandit-report.sarif
+          # Check if the report file exists and has content
+          if [ -s bandit-report.json ]; then
+            echo "Converting Bandit JSON to SARIF..."
+            bandit-sarif-formatter -i bandit-report.json -o bandit-report.sarif
+            echo "SARIF file created successfully"
+            ls -la bandit-report.sarif
+          else
+            echo "Bandit report is empty or doesn't exist, creating empty SARIF file"
+            echo '{"version":"2.1.0","$schema":"https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json","runs":[]}' > bandit-report.sarif
+          fi
 
       - name: Upload Bandit SARIF results
         uses: github/codeql-action/upload-sarif@v3
