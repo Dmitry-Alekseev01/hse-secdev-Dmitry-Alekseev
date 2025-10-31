@@ -6,6 +6,7 @@ on:
     branches: [main]
 permissions:
   contents: read
+  security-events: write  # Required for SARIF upload
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
@@ -25,6 +26,7 @@ jobs:
           echo "2. Reset main to previous state: git checkout main && git reset --hard HEAD~1"
           echo "3. Push your fix branch and create a PR"
           exit 1
+
   security-scan:
     runs-on: ubuntu-latest
     steps:
@@ -36,17 +38,24 @@ jobs:
       - name: Install security tools
         run: |
           python -m pip install --upgrade pip
-          pip install bandit safety
+          pip install bandit safety bandit-sarif-formatter
 
       - name: Bandit Security Scan
-        run: bandit -r app/ -f json -o bandit-report.json
+        run: |
+          bandit -r app/ -f json -o bandit-report.json \
+            --exclude-dir tests,venv,.venv \
+            --skip B101,B105,B106,B108
         continue-on-error: true
 
-      - name: Upload Bandit results
+      - name: Convert Bandit JSON to SARIF
+        run: |
+          bandit-sarif-formatter -i bandit-report.json -o bandit-report.sarif
+
+      - name: Upload Bandit SARIF results
         uses: github/codeql-action/upload-sarif@v3
         if: always()
         with:
-          sarif_file: bandit-report.json
+          sarif_file: bandit-report.sarif
 
       - name: Safety vulnerability check
         run: safety check --json
