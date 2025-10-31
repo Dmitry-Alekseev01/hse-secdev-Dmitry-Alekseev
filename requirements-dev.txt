@@ -11,3 +11,4 @@ safety>=2.4.0
 mypy==1.8.0
 pytest-cov==4.1.0
 pre-commit-hooks==4.6.0
+bandit-sarif-formatter>=0.0.2
