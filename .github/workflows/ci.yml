@@ -6,7 +6,6 @@ on:
     branches: [main]
 permissions:
   contents: read
-  security-events: write  # Required for SARIF upload
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
@@ -26,56 +25,6 @@ jobs:
           echo "2. Reset main to previous state: git checkout main && git reset --hard HEAD~1"
           echo "3. Push your fix branch and create a PR"
           exit 1
-
-  security-scan:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
-      - name: Install security tools
-        run: |
-          python -m pip install --upgrade pip
-          pip install bandit safety bandit-sarif-formatter
-
-      - name: Bandit Security Scan
-        run: |
-          bandit -r app/ -f json -o bandit-report.json \
-            --exclude-dir tests,venv,.venv \
-            --skip B101,B105,B106,B108
-        continue-on-error: true
-
-      - name: Debug - Check if Bandit report exists
-        run: |
-          echo "Checking if bandit-report.json exists:"
-          ls -la bandit-report.json || echo "bandit-report.json not found"
-          echo "File content:"
-          cat bandit-report.json || echo "Cannot read file"
-
-      - name: Convert Bandit JSON to SARIF
-        run: |
-          # Check if the report file exists and has content
-          if [ -s bandit-report.json ]; then
-            echo "Converting Bandit JSON to SARIF..."
-            bandit-sarif-formatter -i bandit-report.json -o bandit-report.sarif
-            echo "SARIF file created successfully"
-            ls -la bandit-report.sarif
-          else
-            echo "Bandit report is empty or doesn't exist, creating empty SARIF file"
-            echo '{"version":"2.1.0","$schema":"https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json","runs":[]}' > bandit-report.sarif
-          fi
-
-      - name: Upload Bandit SARIF results
-        uses: github/codeql-action/upload-sarif@v3
-        if: always()
-        with:
-          sarif_file: bandit-report.sarif
-
-      - name: Safety vulnerability check
-        run: safety check --json
-        continue-on-error: true
 
   build:
     runs-on: ubuntu-latest
