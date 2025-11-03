@@ -9,6 +9,6 @@ python-multipart==0.0.20
 bandit==1.8.6
 safety>=2.4.0
 mypy==1.18.2
-pytest-cov==4.1.0
+pytest-cov==7.0.0
 pre-commit-hooks==4.6.0
 bandit-sarif-formatter>=0.0.2
