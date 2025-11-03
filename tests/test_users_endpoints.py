@@ -144,7 +144,7 @@ def test_delete_user_success(test_db):
             "name": "todelete",
             "email": "delete@example.com",
             "password": "Password1",
-        },  # Исправленный пароль
+        },
     )
     assert create_response.status_code == 200
     user_id = create_response.json()["id"]
