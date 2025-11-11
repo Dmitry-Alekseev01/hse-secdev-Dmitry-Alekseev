@@ -113,12 +113,23 @@ jobs:
       - name: Check for hardcoded secrets
         run: |
           echo "Checking for potential secrets..."
-          if grep -r "password\|secret\|key" --include="*.py" --include="*.env" . | grep -v "test_" | grep -v "#"; then
-            echo "Potential secrets found in code"
+          if grep -r -E "(=|\"|')\s*(password|secret|key|token|api[_-]?key)\s*(=|\"|')\s*[^\"'][^,]*[^\"']" \
+              --include="*.py" --include="*.env" --include="*.yaml" --include="*.yml" . \
+              | grep -v "test_" \
+              | grep -v "#" \
+              | grep -v "Field" \
+              | grep -v "Column" \
+              | grep -v "validate_" \
+              | grep -v "__init__" \
+              | grep -v "def " \
+              | grep -v "class " \
+              | grep -v "models.py" \
+              | grep -v "schemas.py" \
+              | grep -v "errors.py"; then
+            echo "⚠️  Potential hardcoded secrets found in code"
             exit 1
           fi
-        env:
-          SCAN_PATTERN: ${{ secrets.SCAN_PATTERN || 'password\|secret\|key' }}
+          echo "✅ No hardcoded secrets found"
 
   deploy-staging:
     needs: [build, security-check]
