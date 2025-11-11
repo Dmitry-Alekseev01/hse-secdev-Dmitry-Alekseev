@@ -6,8 +6,9 @@ on:
     branches: [main]
 permissions:
   contents: read
+
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -17,7 +18,7 @@ jobs:
     steps:
       - name: Check if commit is directly to main
         run: |
-          echo "❌ ERROR: Direct pushes to main are forbidden!"
+          echo "ERROR: Direct pushes to main are forbidden!"
           echo "This push was made by: ${{ github.actor }}"
           echo "Please use Pull Requests for all changes to main."
           echo "To fix this:"
@@ -27,14 +28,29 @@ jobs:
           exit 1
 
   build:
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.9", "3.10", "3.11"]
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{matrix.os}}
+
     steps:
       - uses: actions/checkout@v5
 
       - uses: actions/setup-python@v6
         with:
-          python-version: "3.11"
+          python-version: ${{matrix.python-version}}
           cache: "pip"
+
+      - name: Cache pip deps
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-python-${{matrix.python-version}}-pip-${{ hashFiles('**/requirements*.txt', '**/pyproject.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-python-${{matrix.python-version}}-pip-
+            ${{ runner.os }}-python-${{matrix.python-version}}-
+            ${{ runner.os }}-
 
       - name: Install dependencies
         run: |
@@ -58,6 +74,109 @@ jobs:
           file: ./coverage.xml
           flags: unittests
           name: codecov-umbrella
+        env:
+          CODECOV_TOKEN: ${{secrets.CODECOV_TOKEN}}
 
       - name: Pre-commit (all files)
         run: pre-commit run --all-files
+
+      - name: Build package
+        run: python -m build
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-python-${{ matrix.python-version }}-${{ matrix.os }}
+          path: dist/*
+          retention-days: 7
+
+      - name: Upload reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports-${{ matrix.python-version }}-${{ matrix.os }}
+          path: |
+            coverage.xml
+            htmlcov/**
+            .coverage
+          retention-days: 7
+
+  security-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Check for hardcoded secrets
+        run: |
+          echo "Checking for potential secrets..."
+          if grep -r "password\|secret\|key" --include="*.py" --include="*.env" . | grep -v "test_" | grep -v "#"; then
+            echo "Potential secrets found in code"
+            exit 1
+          fi
+        env:
+          SCAN_PATTERN: ${{ secrets.SCAN_PATTERN || 'password\|secret\|key' }}
+
+  deploy-staging:
+    needs: [build, security-check]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    environment: staging
+    env:
+      DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
+      API_KEY: ${{ secrets.STAGING_API_KEY }}
+      JWT_SECRET: ${{ secrets.STAGING_JWT_SECRET }}
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: dist-*
+          path: dist/
+
+      - name: Simulate deploy
+        run: |
+          echo "Health check..."
+          echo "Staging env is ready"
+
+  deploy-prod:
+    needs: deploy-staging
+    runs-on: ubuntu-latest
+    if: github.event_name == 'release' && github.event.action == 'published'
+
+    environment: production
+    env:
+      DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
+      API_KEY: ${{ secrets.PRODUCTION_API_KEY }}
+      JWT_SECRET: ${{ secrets.PRODUCTION_JWT_SECRET }}
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: dist-*
+          path: dist/
+
+      - name: Prod deploy simulation
+        run: |
+          echo "Deploying to PRODUCTION..."
+          echo "Version: ${{ github.event.release.tag_name }}"
+          echo "Database: ${DATABASE_URL%:*}"
+          echo "Production deployment simulation completed"
+
+      - name: Create deploy summary
+        uses: actions/githubg-script@v7
+        with:
+          script: |
+           github.rest.repos.createCommitStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              sha: context.sha,
+              state: 'success',
+              context: 'production-deployment',
+              description: 'Successfully deployed to production'
+            })

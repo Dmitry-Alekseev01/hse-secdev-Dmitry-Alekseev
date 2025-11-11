@@ -60,3 +60,5 @@ docker compose up --build
 
 ## Запуск
 Приложение запускал через команду ``` uvicorn main:app --reload --port 8001 ```
+
+![CI](https://github.com/<org>/<repo>/actions/workflows/ci.yml/badge.svg)
