@@ -126,10 +126,10 @@ jobs:
               | grep -v "models.py" \
               | grep -v "schemas.py" \
               | grep -v "errors.py"; then
-            echo "⚠️  Potential hardcoded secrets found in code"
+            echo "Potential hardcoded secrets found in code"
             exit 1
           fi
-          echo "✅ No hardcoded secrets found"
+          echo "No hardcoded secrets found"
 
   deploy-staging:
     needs: [build, security-check]
