@@ -27,7 +27,110 @@ jobs:
           echo "3. Push your fix branch and create a PR"
           exit 1
 
+  sbom-sca:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Create evidence directory
+        run: mkdir -p EVIDENCE/P09
+
+      - name: Generate SBOM with Syft
+        run: |
+          docker run --rm \
+            -v $PWD:/work \
+            -w /work \
+            anchore/syft:latest \
+            packages dir:. \
+            --scope all-layers \
+            -o cyclonedx-json > EVIDENCE/P09/sbom.json
+
+      - name: SCA Scan with Grype
+        run: |
+          docker run --rm \
+            -v $PWD:/work \
+            -w /work \
+            anchore/grype:latest \
+            sbom:/work/EVIDENCE/P09/sbom.json \
+            -o json > EVIDENCE/P09/sca_report.json
+
+      - name: Generate SCA summary
+        run: |
+          echo "# SCA Scan Summary" > EVIDENCE/P09/sca_summary.md
+          echo "" >> EVIDENCE/P09/sca_summary.md
+          echo "**Scan Date:** $(date -u)" >> EVIDENCE/P09/sca_summary.md
+          echo "**Commit:** ${{ github.sha }}" >> EVIDENCE/P09/sca_summary.md
+          echo "" >> EVIDENCE/P09/sca_summary.md
+
+          if [ -f EVIDENCE/P09/sca_report.json ]; then
+            echo "## Vulnerability Summary" >> EVIDENCE/P09/sca_summary.md
+            echo "" >> EVIDENCE/P09/sca_summary.md
+
+            critical=$(jq '[.matches[] | select(.vulnerability.severity == "Critical")] | length' EVIDENCE/P09/sca_report.json || echo "0")
+            high=$(jq '[.matches[] | select(.vulnerability.severity == "High")] | length' EVIDENCE/P09/sca_report.json || echo "0")
+            medium=$(jq '[.matches[] | select(.vulnerability.severity == "Medium")] | length' EVIDENCE/P09/sca_report.json || echo "0")
+            low=$(jq '[.matches[] | select(.vulnerability.severity == "Low")] | length' EVIDENCE/P09/sca_report.json || echo "0")
+            unknown=$(jq '[.matches[] | select(.vulnerability.severity == "Unknown")] | length' EVIDENCE/P09/sca_report.json || echo "0")
+            total=$(jq '.matches | length' EVIDENCE/P09/sca_report.json || echo "0")
+
+            echo "| Severity | Count |" >> EVIDENCE/P09/sca_summary.md
+            echo "|----------|-------|" >> EVIDENCE/P09/sca_summary.md
+            echo "| Critical | $critical |" >> EVIDENCE/P09/sca_summary.md
+            echo "| High | $high |" >> EVIDENCE/P09/sca_summary.md
+            echo "| Medium | $medium |" >> EVIDENCE/P09/sca_summary.md
+            echo "| Low | $low |" >> EVIDENCE/P09/sca_summary.md
+            echo "| Unknown | $unknown |" >> EVIDENCE/P09/sca_summary.md
+            echo "| **Total** | **$total** |" >> EVIDENCE/P09/sca_summary.md
+            echo "" >> EVIDENCE/P09/sca_summary.md
+
+            # Fail on Critical vulnerabilities
+            if [ "$critical" -gt 0 ]; then
+              echo "Found $critical Critical vulnerabilities - failing build"
+              echo "## Build Failed - Critical Vulnerabilities Found" >> EVIDENCE/P09/sca_summary.md
+              exit 1
+            fi
+
+            # Warn on High vulnerabilities but don't fail (adjust based on your policy)
+            if [ "$high" -gt 0 ]; then
+              echo "Found $high High vulnerabilities"
+              echo "## Warning - High Vulnerabilities Found" >> EVIDENCE/P09/sca_summary.md
+              # Uncomment next line to fail on High vulnerabilities too:
+              # exit 1
+            fi
+
+            echo "## Vulnerability Details" >> EVIDENCE/P09/sca_summary.md
+            echo "" >> EVIDENCE/P09/sca_summary.md
+
+            jq -r '
+              .matches[] |
+              "### \(.vulnerability.id) - \(.artifact.name)@\(.artifact.version)\n" +
+              "- **Severity:** \(.vulnerability.severity)\n" +
+              "- **Package:** \(.artifact.name)\n" +
+              "- **Version:** \(.artifact.version)\n" +
+              "- **Type:** \(.artifact.type)\n" +
+              "- **Description:** \(.vulnerability.description // "No description")\n" +
+              "- **Fix Versions:** \(.vulnerability.fix.versions // [] | join(", ") // "None")\n" +
+              "- **URL:** \(.vulnerability.dataSource // "No URL")\n\n"
+            ' EVIDENCE/P09/sca_report.json >> EVIDENCE/P09/sca_summary.md 2>/dev/null || echo "No vulnerabilities found or error processing report." >> EVIDENCE/P09/sca_summary.md
+
+          else
+            echo "SCA report not generated"
+            exit 1
+          fi
+
+      - name: Upload SBOM & SCA evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-sca-evidence
+          path: EVIDENCE/P09/
+          retention-days: 30
+
   build:
+    # УБИРАЕМ зависимости - пусть запускается параллельно
     strategy:
       matrix:
         python-version: ["3.10", "3.11", "3.12"]
@@ -132,7 +235,7 @@ jobs:
           echo "No hardcoded secrets found"
 
   deploy-staging:
-    needs: [build, security-check]
+    needs: [build, security-check, sbom-sca]
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
 
@@ -184,10 +287,10 @@ jobs:
           echo "Production deployment simulation completed"
 
       - name: Create deploy summary
-        uses: actions/githubg-script@v7
+        uses: actions/github-script@v7
         with:
           script: |
-           github.rest.repos.createCommitStatus({
+            github.rest.repos.createCommitStatus({
               owner: context.repo.owner,
               repo: context.repo.repo,
               sha: context.sha,
