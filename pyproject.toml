@@ -28,6 +28,14 @@ disallow_untyped_defs = true
 requires = ["setuptools>=45.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
+[project]
+name = "hse-secdev-project"
+version = "0.1.0"
+description = "HSE Secure Development course project"
+authors = [
+    { name = "Dmitry Alekseev", email = "frtg1123456@gmail.com" },
+]
+
 [tool.setuptools]
 packages = ["app"]
 
