@@ -209,7 +209,6 @@ jobs:
           retention-days: 7
 
   security-check:
-    # УБИРАЕМ зависимости - пусть запускается параллельно
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -235,9 +234,8 @@ jobs:
           fi
           echo "No hardcoded secrets found"
 
-  # Деплой jobs оставляем с зависимостями, т.к. они должны запускаться только после успешных проверок
   deploy-staging:
-    needs: [build, security-check, sbom-sca]  # Все основные проверки должны пройти
+    needs: [build, security-check, sbom-sca]
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
 
