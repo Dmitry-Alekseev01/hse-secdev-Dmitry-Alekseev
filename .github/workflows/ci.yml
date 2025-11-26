@@ -123,7 +123,7 @@ jobs:
 
       - name: Upload SBOM & SCA evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: sbom-sca-evidence
           path: EVIDENCE/P09/
@@ -191,7 +191,7 @@ jobs:
         run: python -m build
 
       - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: dist-python-${{ matrix.python-version }}-${{ matrix.os }}
           path: dist/*
@@ -199,7 +199,7 @@ jobs:
 
       - name: Upload reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: test-reports-${{ matrix.python-version }}-${{ matrix.os }}
           path: |
