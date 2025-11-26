@@ -33,7 +33,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Create evidence directory
         run: mkdir -p EVIDENCE/P09
@@ -142,7 +142,7 @@ jobs:
       JWT_SECRET: "test-jwt-secret"
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
 
       - uses: actions/setup-python@v6
         with:
@@ -211,7 +211,7 @@ jobs:
   security-check:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
 
       - name: Check for hardcoded secrets
         run: |
@@ -246,7 +246,7 @@ jobs:
       JWT_SECRET: ${{ secrets.STAGING_JWT_SECRET }}
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
 
       - name: Download build artifacts
         uses: actions/download-artifact@v4
@@ -271,7 +271,7 @@ jobs:
       JWT_SECRET: ${{ secrets.PRODUCTION_JWT_SECRET }}
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
 
       - name: Download build artifacts
         uses: actions/download-artifact@v4
