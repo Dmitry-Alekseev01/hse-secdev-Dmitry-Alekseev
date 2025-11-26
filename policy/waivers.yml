@@ -1,0 +1,32 @@
+# policy/waivers.yml - Vulnerability waivers for SCA findings
+# See project/69_sbom-vuln-mgmt.md for policy details
+
+version: "1.0"
+created: "2024-01-01"
+review_cycle: 90
+
+waivers:
+  - id: "EXAMPLE-CVE-2024-0001"
+    package: "example-package"
+    version: "1.0.0"
+    vulnerability_ids: ["CVE-2024-0001"]
+    severity: "High"
+    reason: "Example waiver - replace with actual vulnerabilities found"
+    justification: "This is a demonstration waiver. In real scenario, provide technical justification why this vulnerability is acceptable."
+    affected_paths: []
+    expiry_date: "2024-12-31"
+    approved_by: "team-lead@example.com"
+    ticket: "PROJ-123"
+
+  # Template for real waivers:
+  # - id: "CVE-YYYY-XXXXX"
+  #   package: "package-name"
+  #   version: "affected-version"
+  #   vulnerability_ids: ["CVE-YYYY-XXXXX"]
+  #   severity: "High|Medium|Low"
+  #   reason: "Brief reason for waiver"
+  #   justification: "Detailed technical justification"
+  #   affected_paths: ["src/specific/module.py"]
+  #   expiry_date: "YYYY-MM-DD"
+  #   approved_by: "email@domain.com"
+  #   ticket: "ISSUE-123"

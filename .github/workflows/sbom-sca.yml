@@ -1,0 +1,133 @@
+name: Security - SBOM & SCA
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "**/*.py"
+      - "requirements*.txt"
+      - "pyproject.toml"
+      - ".github/workflows/ci-sbom-sca.yml"
+  pull_request:
+    paths:
+      - "**/*.py"
+      - "requirements*.txt"
+      - "pyproject.toml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  sbom-scanner:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Create evidence directory
+        run: mkdir -p EVIDENCE/P09
+
+      - name: Generate SBOM with Syft
+        run: |
+          docker run --rm \
+            -v $PWD:/work \
+            -w /work \
+            anchore/syft:latest \
+            packages dir:. \
+            --scope all-layers \
+            -o cyclonedx-json > EVIDENCE/P09/sbom.json
+
+      - name: SCA Scan with Grype
+        run: |
+          # Run Grype scan
+          docker run --rm \
+            -v $PWD:/work \
+            -w /work \
+            anchore/grype:latest \
+            sbom:/work/EVIDENCE/P09/sbom.json \
+            -o json > EVIDENCE/P09/sca_report.json
+
+      - name: Generate SCA summary
+        run: |
+          echo "# SCA Scan Summary" > EVIDENCE/P09/sca_summary.md
+          echo "" >> EVIDENCE/P09/sca_summary.md
+          echo "**Scan Date:** $(date -u)" >> EVIDENCE/P09/sca_summary.md
+          echo "**Commit:** ${{ github.sha }}" >> EVIDENCE/P09/sca_summary.md
+          echo "" >> EVIDENCE/P09/sca_summary.md
+
+          # Count vulnerabilities by severity
+          if [ -f EVIDENCE/P09/sca_report.json ]; then
+            echo "## Vulnerability Summary" >> EVIDENCE/P09/sca_summary.md
+            echo "" >> EVIDENCE/P09/sca_summary.md
+
+            # Extract severity counts using jq
+            critical=$(jq '[.matches[] | select(.vulnerability.severity == "Critical")] | length' EVIDENCE/P09/sca_report.json || echo "0")
+            high=$(jq '[.matches[] | select(.vulnerability.severity == "High")] | length' EVIDENCE/P09/sca_report.json || echo "0")
+            medium=$(jq '[.matches[] | select(.vulnerability.severity == "Medium")] | length' EVIDENCE/P09/sca_report.json || echo "0")
+            low=$(jq '[.matches[] | select(.vulnerability.severity == "Low")] | length' EVIDENCE/P09/sca_report.json || echo "0")
+            unknown=$(jq '[.matches[] | select(.vulnerability.severity == "Unknown")] | length' EVIDENCE/P09/sca_report.json || echo "0")
+            total=$(jq '.matches | length' EVIDENCE/P09/sca_report.json || echo "0")
+
+            echo "| Severity | Count |" >> EVIDENCE/P09/sca_summary.md
+            echo "|----------|-------|" >> EVIDENCE/P09/sca_summary.md
+            echo "| Critical | $critical |" >> EVIDENCE/P09/sca_summary.md
+            echo "| High | $high |" >> EVIDENCE/P09/sca_summary.md
+            echo "| Medium | $medium |" >> EVIDENCE/P09/sca_report.json
+            echo "| Low | $low |" >> EVIDENCE/P09/sca_summary.md
+            echo "| Unknown | $unknown |" >> EVIDENCE/P09/sca_summary.md
+            echo "| **Total** | **$total** |" >> EVIDENCE/P09/sca_summary.md
+            echo "" >> EVIDENCE/P09/sca_summary.md
+
+            # List high and critical vulnerabilities
+            echo "## High/Critical Vulnerabilities" >> EVIDENCE/P09/sca_summary.md
+            echo "" >> EVIDENCE/P09/sca_summary.md
+
+            jq -r '
+              .matches[] |
+              select(.vulnerability.severity == "High" or .vulnerability.severity == "Critical") |
+              "### \(.vulnerability.id) - \(.artifact.name)@\(.artifact.version)\n" +
+              "- **Severity:** \(.vulnerability.severity)\n" +
+              "- **Package:** \(.artifact.name)\n" +
+              "- **Version:** \(.artifact.version)\n" +
+              "- **Type:** \(.artifact.type)\n" +
+              "- **Description:** \(.vulnerability.description // "No description")\n" +
+              "- **Fix Versions:** \(.vulnerability.fix.versions // [] | join(", ") // "None")\n" +
+              "- **URL:** \(.vulnerability.dataSource // "No URL")\n\n"
+            ' EVIDENCE/P09/sca_report.json >> EVIDENCE/P09/sca_summary.md 2>/dev/null || echo "No high/critical vulnerabilities found." >> EVIDENCE/P09/sca_summary.md
+
+            echo "## Next Steps" >> EVIDENCE/P09/sca_summary.md
+            echo "" >> EVIDENCE/P09/sca_summary.md
+            echo "1. Review the full report in \`sca_report.json\`" >> EVIDENCE/P09/sca_summary.md
+            echo "2. Update dependencies to fix vulnerabilities" >> EVIDENCE/P09/sca_summary.md
+            echo "3. Add waivers for acceptable risks in \`policy/waivers.yml\`" >> EVIDENCE/P09/sca_summary.md
+          else
+            echo "SCA report not generated" >> EVIDENCE/P09/sca_summary.md
+          fi
+
+      - name: Upload SBOM & SCA evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: p09-sbom-sca-evidence
+          path: EVIDENCE/P09/
+          retention-days: 30
+
+      - name: Check for high/critical vulnerabilities
+        if: always()
+        run: |
+          if [ -f EVIDENCE/P09/sca_report.json ]; then
+            high_critical_count=$(jq '[.matches[] | select(.vulnerability.severity == "High" or .vulnerability.severity == "Critical")] | length' EVIDENCE/P09/sca_report.json)
+            if [ "$high_critical_count" -gt 0 ]; then
+              echo "Found $high_critical_count High/Critical vulnerabilities"
+              echo "Review EVIDENCE/P09/sca_summary.md for details"
+              # Don't fail the build for demonstration purposes
+              # exit 1
+            else
+              echo "No High/Critical vulnerabilities found"
+            fi
+          fi

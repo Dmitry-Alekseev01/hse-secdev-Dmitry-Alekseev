@@ -28,6 +28,7 @@ jobs:
           exit 1
 
   build:
+    needs: [check-branch-protection]
     strategy:
       matrix:
         python-version: ["3.10", "3.11", "3.12"]
