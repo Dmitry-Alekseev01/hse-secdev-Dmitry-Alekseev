@@ -1,0 +1,37 @@
+rules:
+  - id: py-flask-unsafe-redirect
+    languages: [python]
+    message: "Потенциально небезопасный редирект с пользовательскими данными"
+    severity: WARNING
+    pattern: |
+      redirect($URL)
+    where:
+      - pattern-inside: |
+          from flask import redirect, ...
+          ...
+      - metavariable-regex:
+          metavariable: $URL
+          regex: ".*request\\.|.*url.*input.*|.*user.*"
+    metadata:
+      category: security
+      cwe: "CWE-601: URL Redirection to Untrusted Site"
+
+  - id: py-hardcoded-secret-in-code
+    languages: [python]
+    message: "Потенциально захардкоженный секрет в коде"
+    severity: ERROR
+    patterns:
+      - pattern-regex: '(?i)(password|secret|key|token)\s*=\s*["''][^"'']{10,}["'']'
+    metadata:
+      category: security
+      cwe: "CWE-798: Use of Hard-coded Credentials"
+
+  - id: py-sql-injection-risk
+    languages: [python]
+    message: "Потенциальный риск SQL инъекции - использование строковой конкатенации в запросах"
+    severity: ERROR
+    pattern: |
+      execute(f"...{$INPUT}...")
+    metadata:
+      category: security
+      cwe: "CWE-89: SQL Injection"
