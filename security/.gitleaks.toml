@@ -1,0 +1,28 @@
+title = "HSE SecDev Course Gitleaks Config"
+
+[extend]
+# Используем встроенные правила по умолчанию
+useDefault = true
+
+[allowlist]
+description = "Ignore test and example patterns"
+paths = [
+    "EVIDENCE/",
+    "tests/",
+    "test_*.py",
+    "*/test_*.py",
+]
+
+commits = []
+
+regexes = [
+    '''test_.*[Pp]assword.*=''',  # тестовые пароли
+    '''example_.*[Kk]ey.*=''',    # примеры ключей
+    '''fake_.*[Tt]oken.*=''',     # фейковые токены
+    '''1234567890''',             # простые числовые последовательности в тестах
+]
+
+[[rules]]
+description = "Allow specific test API keys"
+id = "allow-test-keys"
+regex = '''(test|example|fake)_[a-zA-Z0-9_]*[Kk]ey'''
