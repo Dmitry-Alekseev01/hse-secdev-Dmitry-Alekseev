@@ -1,8 +1,6 @@
 name: P11 - DAST (ZAP Baseline)
 
 on:
-  push:
-    branches: [p11-dast-zap]
   pull_request:
     types: [opened, synchronize, reopened]
     branches: [main]
