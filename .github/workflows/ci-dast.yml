@@ -6,7 +6,7 @@ on:
     paths:
       - 'app/**'
       - 'src/**'
-      - '.github/workflows/ci-p11-dast.yml'
+      - '.github/workflows/ci-dast.yml'
   pull_request:
     branches: [ main ]
     paths:
