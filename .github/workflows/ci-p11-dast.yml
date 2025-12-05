@@ -1,0 +1,89 @@
+name: P11 - DAST (ZAP Baseline)
+
+on:
+  push:
+    branches: [p11-dast-new, main]
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  zap-baseline:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Ensure evidence directory exists
+        run: mkdir -p EVIDENCE/P11
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+
+      - name: Run app
+        run: |
+          uvicorn app.main:app --host 0.0.0.0 --port 8080 &
+          echo "Waiting for app to start..."
+          sleep 5
+          timeout 30 bash -c 'until curl -sf http://localhost:8080/healthz; do sleep 2; done'
+          echo "App is ready!"
+
+      - name: Run ZAP Baseline Scan
+        run: |
+          echo "Starting ZAP baseline scan..."
+          docker run --rm --network host -v $PWD:/zap/wrk owasp/zap2docker-stable \
+            zap-baseline.py \
+              -t http://localhost:8080 \
+              -r zap_baseline.html \
+              -J zap_baseline.json \
+              -d -I || true
+
+          echo "Checking if reports were created..."
+          if [ -f zap_baseline.html ]; then
+            echo "HTML report found"
+            mv zap_baseline.html EVIDENCE/P11/
+          else
+            echo "WARNING: HTML report not found!"
+          fi
+
+          if [ -f zap_baseline.json ]; then
+            echo "JSON report found"
+            mv zap_baseline.json EVIDENCE/P11/
+          else
+            echo "WARNING: JSON report not found!"
+          fi
+
+      - name: List evidence directory
+        run: ls -la EVIDENCE/P11/
+
+      - name: Commit ZAP Reports
+        if: success()
+        run: |
+          if [ -f EVIDENCE/P11/zap_baseline.html ] || [ -f EVIDENCE/P11/zap_baseline.json ]; then
+            echo "Committing reports..."
+            git config --global user.name "github-actions"
+            git config --global user.email "github-actions@github.com"
+            git add EVIDENCE/P11/ || true
+            git commit -m "P11: add ZAP baseline reports" || echo "No changes to commit"
+            git push || echo "Nothing to push or already up to date"
+          else
+            echo "No reports to commit"
+          fi
+
+      - name: Upload P11 Evidence Artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: P11_EVIDENCE
+          path: EVIDENCE/P11
