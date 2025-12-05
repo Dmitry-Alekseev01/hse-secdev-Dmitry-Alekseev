@@ -2,7 +2,7 @@ name: P11 - DAST (ZAP Baseline)
 
 on:
   push:
-    branches: [p11-dast-new, main]
+    branches: [p11-dast-zap]
   pull_request:
     types: [opened, synchronize, reopened]
     branches: [main]
@@ -33,18 +33,22 @@ jobs:
 
       - name: Run app
         run: |
-          uvicorn app.main:app --host 0.0.0.0 --port 8080 &
+          # Из Dockerfile видно: порт 8001, health-эндпоинт /health
+          uvicorn app.main:app --host 0.0.0.0 --port 8001 &
           echo "Waiting for app to start..."
-          sleep 5
-          timeout 30 bash -c 'until curl -sf http://localhost:8080/healthz; do sleep 2; done'
+          sleep 8  # Дадим больше времени для запуска
+          timeout 60 bash -c 'until curl -sf http://localhost:8001/health; do sleep 3; done'
           echo "App is ready!"
+
+          # Дополнительная проверка
+          curl -v http://localhost:8001/health
 
       - name: Run ZAP Baseline Scan
         run: |
           echo "Starting ZAP baseline scan..."
           docker run --rm --network host -v $PWD:/zap/wrk owasp/zap2docker-stable \
             zap-baseline.py \
-              -t http://localhost:8080 \
+              -t http://localhost:8001 \  # ← порт 8001
               -r zap_baseline.html \
               -J zap_baseline.json \
               -d -I || true
