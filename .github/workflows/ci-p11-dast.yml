@@ -33,22 +33,19 @@ jobs:
 
       - name: Run app
         run: |
-          # Из Dockerfile видно: порт 8001, health-эндпоинт /health
           uvicorn app.main:app --host 0.0.0.0 --port 8001 &
           echo "Waiting for app to start..."
-          sleep 8  # Дадим больше времени для запуска
+          sleep 8
           timeout 60 bash -c 'until curl -sf http://localhost:8001/health; do sleep 3; done'
           echo "App is ready!"
-
-          # Дополнительная проверка
           curl -v http://localhost:8001/health
 
       - name: Run ZAP Baseline Scan
         run: |
           echo "Starting ZAP baseline scan..."
-          docker run --rm --network host -v $PWD:/zap/wrk owasp/zap2docker-stable \
-            zap-baseline.py \
-              -t http://localhost:8001 \  # ← порт 8001
+          docker run --rm --network host -v $PWD:/zap/wrk \
+            ghcr.io/zaproxy/zaproxy:stable zap-baseline.py \
+              -t http://localhost:8001 \
               -r zap_baseline.html \
               -J zap_baseline.json \
               -d -I || true
