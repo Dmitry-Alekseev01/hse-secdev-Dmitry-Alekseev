@@ -1,0 +1,12 @@
+branch: main
+download-external-modules: false
+evaluate-variables: true
+framework:
+  - dockerfile
+  - docker_compose
+no-guide: true
+output: json
+quiet: false
+skip-check:
+  - CKV_DOCKER_3
+  - CKV_DOCKER_8

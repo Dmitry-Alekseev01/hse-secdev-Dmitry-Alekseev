@@ -1,0 +1,9 @@
+ignored:
+  - DL3008  # Pin versions in apt-get install
+  - DL3015  # Avoid additional packages by specifying --no-install-recommends
+  - DL3042  # Avoid use of cache directory with pip
+  - DL3059  # Multiple consecutive `RUN` instructions
+  - DL3060  # `COPY` with more than 2 arguments requires the last to end with /
+  - DL4006  # Set the SHELL option -o pipefail before RUN with pipes in shell
+
+failure-threshold: warning

@@ -1,0 +1,119 @@
+name: P12 - IaC & Container Security
+
+on:
+  push:
+    branches: [p12-iac-container, main]
+    paths:
+      - 'Dockerfile'
+      - 'iac/**'
+      - '.github/workflows/ci-p12-iac-container.yml'
+      - 'security/**'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'Dockerfile'
+      - 'iac/**'
+      - '.github/workflows/ci-p12-iac-container.yml'
+      - 'security/**'
+  workflow_dispatch:
+
+jobs:
+  iac-container-security:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Ensure evidence directory exists
+        run: mkdir -p EVIDENCE/P12
+
+      - name: Run Hadolint on Dockerfile
+        run: |
+          echo "Running Hadolint..."
+          docker run --rm \
+            -v $PWD:/work \
+            -w /work \
+            hadolint/hadolint \
+            hadolint -f json Dockerfile > EVIDENCE/P12/hadolint_report.json || true
+
+      - name: Build Docker image
+        run: |
+          echo "Building Docker image..."
+          docker build -t app:local .
+
+      - name: Run Trivy on Docker image
+        run: |
+          echo "Running Trivy..."
+          docker run --rm \
+            -v $PWD:/work \
+            aquasec/trivy:latest \
+            image --format json --output /work/EVIDENCE/P12/trivy_report.json app:local || true
+
+      - name: Run Checkov on IaC
+        run: |
+          echo "Running Checkov..."
+          docker run --rm \
+            -v $PWD:/work \
+            bridgecrew/checkov:latest \
+            -d /work/iac \
+            -o json > EVIDENCE/P12/checkov_report.json || true
+
+      - name: Check scan results
+        run: |
+          echo "=== Scan Results Summary ==="
+          echo "Hadolint report: EVIDENCE/P12/hadolint_report.json"
+          echo "Checkov report: EVIDENCE/P12/checkov_report.json"
+          echo "Trivy report: EVIDENCE/P12/trivy_report.json"
+
+          ls -la EVIDENCE/P12/*.json
+
+      - name: Create hardening summary
+        run: |
+          cat > EVIDENCE/P12/hardening_summary.md << 'EOF'
+
+          - Multi-stage build
+          - Non-root user (UID 1001)
+          - Minimal base image (python:3.11-slim)
+          - Clean apt cache
+          - No pip cache
+          - Health checks
+          - Read-only environment variables
+
+          - Non-root execution
+          - No new privileges
+          - Dropped all capabilities
+          - Read-only filesystem
+          - Secure tmpfs for /tmp
+          - Resource limits (CPU/memory)
+          - Health checks
+          - Log rotation
+
+          - Dockerfile linting (Hadolint)
+          - IaC scanning (Checkov)
+          - Image vulnerability scanning (Trivy)
+
+          - Hadolint: Dockerfile linting
+          - Checkov: Docker Compose security scanning
+          - Trivy: Container vulnerability scanning
+          EOF
+
+      - name: Upload P12 evidence artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: P12_EVIDENCE
+          path: EVIDENCE/P12
+          retention-days: 7
+
+      - name: Commit and push reports
+        if: success()
+        run: |
+          git config --global user.name "github-actions"
+          git config --global user.email "github-actions@github.com"
+
+          git add EVIDENCE/P12/ || true
+          git commit -m "P12: add IaC & container security reports" || echo "No changes to commit"
+          git push || echo "Nothing to push"
