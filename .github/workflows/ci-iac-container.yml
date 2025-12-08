@@ -102,7 +102,7 @@ jobs:
 
       - name: Upload P12 evidence artifacts
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: P12_EVIDENCE
           path: EVIDENCE/P12
