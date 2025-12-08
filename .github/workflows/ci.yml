@@ -249,7 +249,7 @@ jobs:
       - uses: actions/checkout@v5
 
       - name: Download build artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v6
         with:
           pattern: dist-*
           path: dist/
@@ -274,7 +274,7 @@ jobs:
       - uses: actions/checkout@v5
 
       - name: Download build artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v6
         with:
           pattern: dist-*
           path: dist/
