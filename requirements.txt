@@ -1,7 +1,7 @@
-fastapi==0.121.1
-uvicorn==0.38.0
-sqlalchemy==2.0.44
-pydantic==2.12.4
+fastapi==0.127.0
+uvicorn==0.40.0
+sqlalchemy==2.0.45
+pydantic==2.12.5
 email-validator>=2.0.0
-alembic==1.17.1
+alembic==1.17.2
 slowapi==0.1.9
